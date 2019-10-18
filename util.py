@@ -11,10 +11,13 @@ def normalized(X):
     X = (X-minX)/(maxX - minX)
     return X
 
-def imshow(X):
+def imshow(X,cmap=None):
     X = np.maximum(X,0)
     X = np.minimum(X,1)
-    plt.imshow(X) 
+    if cmap!=None:
+        plt.imshow(X,cmap=cmap)
+    else:
+        plt.imshow(X)
     plt.axis('off') 
     plt.show() 
 

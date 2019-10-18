@@ -1,5 +1,5 @@
 import tensorflow as tf
-from Deblur_Net import Deblur_Net
+from CreateKernel import Create_Kernel
 from mode import train,test,test_only
 import argparse
 
@@ -17,7 +17,7 @@ parser.add_argument("--gen_resblocks", type = int, default = 9)
 parser.add_argument("--Kgen_resblocks", type = int, default = 6)
 parser.add_argument("--discrim_blocks", type = int, default = 3)
 parser.add_argument("--Kdiscrim_blocks", type = int, default = 3)
-parser.add_argument("--Kernel_size", type = int, default = 17)
+parser.add_argument("--Kernel_size", type = int, default = 15)
 
 ## Data specification 
 parser.add_argument("--train_Sharp_path", type = str, default = "./sharp/")
@@ -45,7 +45,7 @@ parser.add_argument("--augmentation", type = str2bool, default = True)
 parser.add_argument("--load_X", type = int, default = 640)
 parser.add_argument("--load_Y", type = int, default = 360)
 parser.add_argument("--fine_tuning", type = str2bool, default = False)
-parser.add_argument("--log_freq", type = int, default = 100)
+parser.add_argument("--log_freq", type = int, default = 10)
 parser.add_argument("--model_save_freq", type = int, default = 1)
 parser.add_argument("--test_batch", type = int, default = 1)
 parser.add_argument("--pre_trained_model", type = str, default = "./")
@@ -57,7 +57,7 @@ parser.add_argument("--chop_shave", type = int, default = 16)
 
 args = parser.parse_args()
 
-model = Deblur_Net(args)
+model = Create_Kernel(args)
 model.build_graph()
 
 print("Build model!")

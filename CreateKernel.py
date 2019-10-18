@@ -84,11 +84,10 @@ class Create_Kernel():
             h3_deconv = tf_utils.norm(h3_deconv, _type='instance', name='h3_norm')
             h3_relu = tf.nn.relu(h3_deconv, name='h3_relu')
             
-            # from (N, 32, 32, 32) to (N, 17,17, 1)
-            h4 = tf_utils.conv2d(h3_relu,k=1,k_h=2, k_w=2, d_h=1, d_w=1, stddev=0.02, padding='VALID',name='h4_conv2d',is_print=False)
-            x = tf.clip_by_value(h4, 0, 1.0)
-            x=x/(tf.math.reduce_sum(x))
-            
+            # from (N, 32, 32, 32) to (N, 15,15, 1)
+            h4 = tf_utils.conv2d(h3_relu,k=1,k_h=4, k_w=4, d_h=2, d_w=2, stddev=0.02, padding='VALID',name='h4_conv2d',is_print=False)
+            x=(h4-tf.reduce_min(h4))/(tf.reduce_max(h4)-tf.reduce_sum(h4))
+            x=x/tf.reduce_sum(x)
             return x
     
     def Kdiscriminator(self, x, reuse = False, name = 'Kd_'):
@@ -109,7 +108,7 @@ class Create_Kernel():
                 x = tf.nn.leaky_relu(x)
                 
             prev = n
-            n = min(2**self.discrim_blocks, 8)
+            n = min(2**self.Kdiscrim_blocks, 8)
             x = Conv(name = 'conv_d1', x = x, filter_size = 4, in_filters = self.n_feats * prev, out_filters = self.n_feats * n, strides = 1, padding = "SAME")
             x = instance_norm(name = 'instance_norm_d1', x = x, dim = self.n_feats * n)
             x = tf.nn.leaky_relu(x)
@@ -120,10 +119,10 @@ class Create_Kernel():
             return x
         
     def gradient_penalty(self):
-        alpha = tf.random_uniform(shape=[self.flags.batch_size, 1, 1, 1], minval=0., maxval=1.)
+        alpha = tf.random_uniform(shape=[self.batch_size, 1, 1, 1], minval=0., maxval=1.)
         differences = self.gene_img - self.blur
         interpolates = self.blur + (alpha * differences)
-        gradients = tf.gradients(self.Kdiscriminator(interpolates, is_reuse=True), [interpolates])[0]
+        gradients = tf.gradients(self.Kdiscriminator(interpolates, reuse=True), [interpolates])[0]
         slopes = tf.sqrt(tf.reduce_sum(tf.square(gradients), reduction_indices=[1, 2, 3]))
         gradient_penalty = tf.reduce_mean((slopes-1.)**2)
 
@@ -134,7 +133,7 @@ class Create_Kernel():
 
         self.blur = tf.placeholder(name = "blur", shape = [None, None, None, self.channel], dtype = tf.float32)
         self.sharp = tf.placeholder(name = "sharp", shape = [None, None, None, self.channel], dtype = tf.float32)
-        self.Knoise = tf.placeholder(name = "sharp", shape = [None,self.Kernel_size,self.Kernel_size, self.channel], dtype = tf.float32)
+        self.Knoise = tf.placeholder(name = "sharp", shape = [None,64], dtype = tf.float32)
         blur = self.blur
         sharp = self.sharp
         Knoise = self.Knoise
@@ -145,15 +144,16 @@ class Create_Kernel():
         sharp = (2.0 * sharp / 255.0) - 1.0
         
         
-        self.gene_K = self.generator(Knoise, reuse = False)
+        self.gene_K = self.KGenerator(Knoise, reuse = False)
         K=self.gene_K
         Kernel = tf.tile(tf.reshape(K,[self.Kernel_size,self.Kernel_size,1,1]),[1,1,3,1])
         sharp = tf.pad(sharp, [[0,0],[self.Kernel_size//2,self.Kernel_size//2],[self.Kernel_size//2,self.Kernel_size//2],[0,0]], mode = 'REFLECT')
         self.gene_img = tf.nn.depthwise_conv2d(sharp, Kernel, [1,1,1,1], padding = 'VALID')
         
+        self.reg_loss = tf.reduce_sum(tf.multiply(K,tf.log(0.1+K)))/1000.0
         
-        self.real_prob = self.discriminator(blur, reuse = False)
-        self.fake_prob = self.discriminator(self.gene_img, reuse = True)
+        self.real_prob = self.Kdiscriminator(blur, reuse = False)
+        self.fake_prob = self.Kdiscriminator(self.gene_img, reuse = True)
         
 #        epsilon = tf.random_uniform(shape = [self.batch_size, 1, 1, 1], minval = 0.0, maxval = 1.0)
 #        
@@ -169,8 +169,8 @@ class Create_Kernel():
 #            self.vgg_net.build(tf.concat([label, self.gene_img], axis = 0))
 #            self.content_loss = tf.reduce_mean(tf.reduce_sum(tf.square(self.vgg_net.relu3_3[self.batch_size:] - self.vgg_net.relu3_3[:self.batch_size]), axis = 3))
             
-            self.D_loss = d_loss_real + d_loss_fake +self.gp_loss#+ 10.0 * GP_loss
-            self.G_loss = - d_loss_fake #+ 100.0 * self.content_loss
+            self.D_loss = d_loss_real + d_loss_fake +self.gp_loss
+            self.G_loss = - d_loss_fake +self.reg_loss
 
 #            t_vars = tf.trainable_variables()
 #            G_vars = [var for var in t_vars if 'generator' in var.name]

@@ -33,25 +33,25 @@ def train(args, model, sess, saver):
         for k in range(step):
             s_time = time.time()
             blur_batch, sharp_batch = util.batch_gen(blur_imgs, sharp_imgs, args.patch_size, args.batch_size, random_index, k, args.augmentation)
-            Knoise = np.random.randn(1,args.Kernel_size,args.Kernel_size,args.channel)
+            Knoise = np.random.randn(args.batch_size,64)
             for t in range(args.critic_updates):
                 _, D_loss = sess.run([model.D_train, model.D_loss], feed_dict = {model.blur : blur_batch, model.sharp : sharp_batch,model.Knoise:Knoise, model.epoch : epoch})
             
-            if k+1 % args.log_freq == 0:
-                _, G_loss,gene_K,gene_img = sess.run([model.G_train, model.G_loss,model.gene_K,model.gene_img], feed_dict = {model.blur : blur_batch, model.sharp : sharp_batch,model.Knoise:Knoise, model.epoch : epoch})
+            if (k+1) % args.log_freq == 0:
+                _, G_loss,gene_K,gene_img,reg_loss,D_loss,G_loss,gp_loss = sess.run([model.G_train, model.G_loss,model.gene_K,model.gene_img,model.reg_loss,model.D_loss,model.G_loss,model.gp_loss], feed_dict = {model.blur : blur_batch, model.sharp : sharp_batch,model.Knoise:Knoise, model.epoch : epoch})
                 gene_K=util.normalized(gene_K)
                 gene_img=util.normalized(gene_img)
-                util.imshow(gene_K)
-                toshow = np.hstack((sharp_batch[0],blur_batch[0],gene_img[0]))
+                util.imshow(gene_K[0,:,:,0],cmap='gray')
+                toshow = np.hstack((sharp_batch[0]/255.0,blur_batch[0]/255.0,gene_img[0]))
                 util.imshow(toshow)
-                print("training with %d epoch %d/%d batch ... "%(epoch,k+1,step))
+                print("training with %d epoch %d/%d batch, D_loss: %0.2f, gp_loss: %0.2f, G_loss: %0.2f, reg_loss: %0.2f "%(epoch,k+1,step,D_loss,gp_loss,G_loss,reg_loss))
             else:
                 _, G_loss = sess.run([model.G_train, model.G_loss], feed_dict = {model.blur : blur_batch, model.sharp : sharp_batch,model.Knoise:Knoise, model.epoch : epoch})
             
             e_time = time.time()
         
 #        if epoch % args.log_freq == 0:
-        summary = sess.run(merged, feed_dict = {model.blur : blur_batch, model.sharp: sharp_batch})
+        summary = sess.run(merged, feed_dict = {model.blur : blur_batch, model.sharp: sharp_batch,model.Knoise:Knoise, model.epoch : epoch})
         train_writer.add_summary(summary, epoch)
 #            if args.test_with_train:
 #                test(args, model, sess, saver, f, epoch, loading = False)
