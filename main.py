@@ -17,7 +17,7 @@ parser.add_argument("--gen_resblocks", type = int, default = 9)
 parser.add_argument("--Kgen_resblocks", type = int, default = 6)
 parser.add_argument("--discrim_blocks", type = int, default = 3)
 parser.add_argument("--Kdiscrim_blocks", type = int, default = 3)
-parser.add_argument("--Kernel_size", type = int, default = 11)
+parser.add_argument("--Kernel_size", type = int, default = 17)
 
 ## Data specification 
 parser.add_argument("--train_Sharp_path", type = str, default = "./sharp/")
